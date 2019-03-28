@@ -1,0 +1,34 @@
+{
+    "version": 2,
+    "name": "notify-me",
+    "builds": [
+        {
+            "src": "notify.js",
+            "use": "@now/node"
+        },
+        {
+            "src": "webhook.js",
+            "use": "@now/node"
+        }
+    ],
+    "env": {
+        "TELEGRAM_BOT_TOKEN": "@telegram-token",
+        "ENC_PASSWORD": "@prod-password"
+    },
+    "routes": [
+        {
+            "src": "/n/(?<token>.+)",
+            "dest": "/notify.js?token=$token",
+            "methods": [
+                "POST"
+            ]
+        },
+        {
+            "src": "/webhook",
+            "dest": "/webhook.js",
+            "methods": [
+                "POST"
+            ]
+        }
+    ]
+}
