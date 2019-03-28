@@ -16,8 +16,8 @@ module.exports = (req, res) => {
   })
 
   bot.once('message_error', e => {
+    console.log(e.message)
     res.statusCode = 500
-    // res.statusMessage =
     res.end(e.response.body.description)
   })
 }
