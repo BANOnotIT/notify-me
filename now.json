@@ -19,16 +19,12 @@
         {
             "src": "/n/(?<token>.+)",
             "dest": "/notify.js?token=$token",
-            "methods": [
-                "POST"
-            ]
+            "methods": [ "POST" ]
         },
         {
             "src": "/webhook",
             "dest": "/webhook.js",
-            "methods": [
-                "POST"
-            ]
+            "methods": [ "POST" ]
         }
     ]
 }
