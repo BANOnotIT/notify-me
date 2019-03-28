@@ -10,11 +10,12 @@ module.exports = bot
 
 bot.on('message', msg => {
   const chatId = msg.chat.id
-  const message = `Hi there!
-Your token is \`${gen(chatId)}\`
-`
 
-  bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+  gen(chatId)
+    .then(token => {
+      const message = `Hi there!\nYour token is \`${token}\``
+      return bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+    })
     .then(() => bot.emit('message_sent'))
     .catch(e => bot.emit('message_error', e))
 })

@@ -20,18 +20,23 @@ module.exports = {
       cipher.final()
     ])
 
-    return bs58.encode(result)
+    return Promise.resolve(bs58.encode(result))
   },
   get (data) {
-    let buf = bs58.decode(data)
+    try {
+      let buf = bs58.decode(data)
+      console.log(':1:', buf)
+      const cipher = crypto.createDecipher(algorithm, process.env.ENC_PASSWORD)
 
-    const cipher = crypto.createDecipher(algorithm, process.env.ENC_PASSWORD)
+      let result = Buffer.concat([
+        cipher.update(buf),
+        cipher.final()
+      ])
 
-    let result = Buffer.concat([
-      cipher.update(buf),
-      cipher.final()
-    ])
-
-    return result.readInt32LE(0)
+      console.log(':2:', result)
+      return Promise.resolve(result.readInt32LE(0))
+    } catch (e) {
+      return Promise.reject(e)
+    }
   }
 }
