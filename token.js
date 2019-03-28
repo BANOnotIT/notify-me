@@ -6,17 +6,14 @@ const
   crypto = require('crypto')
 const bs58 = require('bs58')
 
-const
-  algorithm = 'aes-192-cbc'
-const key = crypto.scryptSync(process.env.ENC_PASSWORD || 'SimplePass', '$0meSaulte', 24)
-const iv = Buffer.alloc(16, 0) // Initialization vector.
+const algorithm = 'aes128'
 
 module.exports = {
   gen (data) {
     let buf = Buffer.alloc(8, 0)
     buf.writeInt32LE(data, 0)
 
-    const cipher = crypto.createCipheriv(algorithm, key, iv)
+    const cipher = crypto.createCipher(algorithm, process.env.ENC_PASSWORD)
 
     let result = Buffer.concat([
       cipher.update(buf),
@@ -28,7 +25,7 @@ module.exports = {
   get (data) {
     let buf = bs58.decode(data)
 
-    const cipher = crypto.createDecipheriv(algorithm, key, iv)
+    const cipher = crypto.createDecipher(algorithm, process.env.ENC_PASSWORD)
 
     let result = Buffer.concat([
       cipher.update(buf),
