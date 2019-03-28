@@ -10,13 +10,14 @@ module.exports = (req, res) => {
     .then(JSON.parse)
     .then(obj => bot.processUpdate(obj))
 
-    .then(() => {
-      res.status(200)
-      res.end()
-    })
-    .catch(e => {
-      res.status(500)
-      res.end(e.response.body.description)
-    })
-  // .finally(() => res.end())
+  bot.once('message_sent', () => {
+    res.statusCode = 200
+    res.end()
+  })
+
+  bot.once('message_error', e => {
+    res.statusCode = 500
+    // res.statusMessage =
+    res.end(e.response.body.description)
+  })
 }

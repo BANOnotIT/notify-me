@@ -10,10 +10,13 @@ module.exports = bot
 bot.on('message', msg => {
   const chatId = msg.chat.id
   const message = `Hi there
-${Date.now()}
+${new Date()}
+< ${msg.text}
 `
 
   bot.sendMessage(chatId,
     message
   )
+    .then(() => bot.emit('message_sent'))
+    .catch(e => bot.emit('message_error', e))
 })
