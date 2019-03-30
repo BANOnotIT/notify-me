@@ -4,4 +4,12 @@
 
 const a = require('./token')
 
-console.assert(a.get(a.gen(15)) === 15)
+a.gen(15)
+  .then(data => {
+    console.log(data)
+    return data
+  })
+  .then(a.get)
+  .then(enc => {
+    console.assert(enc === 15, 'passwords don\'t match')
+  })
