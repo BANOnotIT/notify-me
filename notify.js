@@ -2,94 +2,114 @@
  * Created by BANO.notIT on 28.03.19.
  */
 const bot = require('./bot')
-const { get: getChatId } = require('./token')
+const { get } = require('./token')
 
-const { parse } = require('url')
-const streamToStr = require('stream-to-string')
 const Busboy = require('busboy')
-const EventEmitter = require('events')
-
-class Sender extends EventEmitter {
-  constructor (request) {
-    super()
-    this.request = request
-    this.in_progress = 0
-    this.results = []
-
-    this.on('done', () => {
-      console.log(this.in_progress)
-      if (this.in_progress === 0) {
-        this.emit('finish', this.results)
-      }
-    })
-  }
-
-  pushFile (stream, filename) {
-    ++this.in_progress
-    bot.sendDocument(this.request.chat_id, this.request)
-      .then(() => `Document ${filename} sent!`)
-      .then(this.results.push.bind(this))
-      .then(() => {
-        --this.in_progress
-        this.emit('done')
-      })
-
-      .catch(this.emit.bind(this, 'error'))
-  }
-
-  pushMessage (message, field = '') {
-    ++this.in_progress
-    streamToStr(this.request, 'utf-8')
-      .then(text => text
-        ? `**You've received** (${(new Date()).toLocaleString()}):\n${text}`
-        : '**You\'ve asked to remind of something**'
-      )
-      .then(text => bot.sendMessage(this.request.chat_id, text))
-      .then(() => `Notification ${field} sent!`)
-      .then(this.results.push.bind(this))
-      .then(() => {
-        --this.in_progress
-        this.emit('done')
-      })
-
-      .catch(this.emit.bind(this, 'error'))
-  }
-}
+const Promise = require('bluebird')
+const createError = require('http-errors')
+const inspect = require('util').inspect
 
 module.exports = (req, res) => {
-  let { query: { token = null } } = parse(req.url, true)
+  console.log(inspect(req.headers))
 
-  getChatId(token)
+  getChatId(req)
     .then(id => {
       req.chat_id = id
       return req
     })
-    .then(req =>
-      new Promise((resolve, reject) => {
-        let processor = new Sender(req)
-        try {
-          let busboy = new Busboy({ headers: req.headers })
-          processor.on('finish', resolve)
-          processor.on('error', reject)
+    .then(req => new Promise(resolve => {
+      let busboy = new Busboy({ headers: req.headers })
 
-          busboy.on('file', (_, file, name) => processor.pushFile(file, name))
-          busboy.on('field', (_, text) => processor.pushMessage(text))
-          busboy.on('finish', () => processor.emit.bind('done'))
-        } catch (e) {
-          return reject(e)
-        }
-      })
-    )
+      consumeIntoFilesFields(busboy, req)
+        .then(resolve)
 
+      req.pipe(busboy)
+    }))
     .then(data => {
+      console.log(data)
       res.statusCode = 200
-      data.forEach(a => {
-        console.log(a.constructor.toString())
-      })
       res.end(data.join('\n'))
     })
     .catch(e => {
       res.statusCode = e.status || 500
       res.end(e.stack)
+    })
+}
+
+function consumeIntoFilesFields (busboy, req) {
+  return new Promise(resolve => {
+    let result = []
+    let bearer = 0
+
+    const done = () => result.length === bearer && resolve(result)
+
+    busboy.on('file', (_, stream, filename) => {
+      ++bearer
+      pushFile(req, stream, filename)
+        .then(a => {
+          result.push(a)
+          done()
+        })
+        .catch(e => {
+          console.log(filename)
+          stream.resume()
+          result.push(`Error while sending file "${filename}": ${e.message}`)
+        })
+    })
+
+    busboy.on('field', (field, text) => {
+      ++bearer
+      pushMessage(req, text, field)
+        .then(a => {
+          result.push(a)
+          done()
+        })
+        .catch(e =>
+          result.push(`Error while sending field "${field}": ${e.message}`)
+        )
+    })
+
+    busboy.on('finish', done)
+  })
+}
+
+function pushFile (request, stream, filename) {
+  console.log(`Start sending ${filename}`)
+  return bot.sendDocument(request.chat_id, stream, {}, { filename })
+    .then(() => `Document "${filename}" sent!`)
+}
+
+function pushMessage (request, message, field = '') {
+  return Promise.resolve(
+    `*You've received* ${field}(${(new Date()).toLocaleString()}):\n${message}`
+  )
+    .then(text =>
+      bot.sendMessage(request.chat_id, text, { parse_mode: 'Markdown' })
+    )
+    .then(() => `Notification "${field}" sent!`)
+}
+
+function getChatId (req) {
+  if (!req.headers.hasOwnProperty('authorization')) {
+    return Promise.reject(createError(401))
+  }
+
+  const auth = req.headers['authorization']
+
+  if (auth.indexOf('Basic ') !== 0) {
+    return Promise.reject(createError(401, 'Only Basic auth supported'))
+  }
+
+  let decoded
+  try {
+    decoded = Buffer.from(auth.split(' ')[1], 'base64')
+      .toString('ascii')
+  } catch (e) {
+    return Promise.reject(createError(401, 'Bad base64'))
+  }
+
+  return get(decoded)
+    .catch(e => {
+      throw createError(400, `Key decryption failed: ${e.message}`)
     })
 }
